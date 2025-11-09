@@ -1,0 +1,1069 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GDScript Academy - Aprende GDScript como Duolingo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        
+        .lesson-complete {
+            background: linear-gradient(135deg, #10b981, #059669);
+            animation: pulse 2s infinite;
+        }
+        
+        .lesson-current {
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
+        }
+        
+        .lesson-locked {
+            background: #6b7280;
+            opacity: 0.6;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        
+        .code-editor {
+            background: #1e293b;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .progress-bar {
+            transition: width 0.5s ease-in-out;
+        }
+        
+        .correct-answer {
+            background-color: #10b981 !important;
+            color: white !important;
+        }
+        
+        .wrong-answer {
+            background-color: #ef4444 !important;
+            color: white !important;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
+    <!-- Header -->
+    <header class="bg-white shadow-lg border-b-4 border-blue-500">
+        <div class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                    <span class="text-white font-bold text-lg">G</span>
+                </div>
+                <h1 class="text-2xl font-bold text-gray-800">GDScript Academy</h1>
+            </div>
+            <div class="flex items-center space-x-4">
+                <div class="flex items-center space-x-2">
+                    <span class="text-orange-500 text-xl">🔥</span>
+                    <span id="streak" class="font-semibold text-gray-700">0</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <span class="text-yellow-500 text-xl">⭐</span>
+                    <span id="points" class="font-semibold text-gray-700">0</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-6xl mx-auto px-4 py-8">
+        <!-- Lesson Map View -->
+        <div id="lessonMap" class="space-y-8">
+            <div class="text-center mb-8">
+                <h2 class="text-3xl font-bold text-gray-800 mb-2">Tu Camino de Aprendizaje</h2>
+                <p class="text-gray-600">Domina GDScript paso a paso</p>
+                <div class="mt-4 bg-white rounded-full p-2 inline-block shadow-lg">
+                    <div class="bg-gray-200 rounded-full h-4 w-80">
+                        <div id="overallProgress" class="bg-gradient-to-r from-green-400 to-blue-500 h-4 rounded-full progress-bar" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Lessons Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="lessonsGrid">
+                <!-- Lessons will be generated here -->
+            </div>
+        </div>
+
+        <!-- Lesson Content View -->
+        <div id="lessonContent" class="hidden">
+            <div class="bg-white rounded-xl shadow-xl p-8 max-w-4xl mx-auto">
+                <!-- Lesson Header -->
+                <div class="flex items-center justify-between mb-6">
+                    <button id="backToMap" class="flex items-center space-x-2 text-blue-600 hover:text-blue-800 transition-colors">
+                        <span>←</span>
+                        <span>Volver al mapa</span>
+                    </button>
+                    <div class="flex items-center space-x-4">
+                        <div class="bg-gray-200 rounded-full h-3 w-48">
+                            <div id="lessonProgress" class="bg-gradient-to-r from-green-400 to-blue-500 h-3 rounded-full progress-bar" style="width: 0%"></div>
+                        </div>
+                        <span id="questionCounter" class="text-sm text-gray-600">1/5</span>
+                    </div>
+                </div>
+
+                <!-- Question Content -->
+                <div id="questionContent">
+                    <!-- Dynamic content will be inserted here -->
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex justify-between mt-8">
+                    <button id="skipBtn" class="px-6 py-3 text-gray-600 hover:text-gray-800 transition-colors">
+                        Saltar
+                    </button>
+                    <button id="checkBtn" class="px-8 py-3 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg font-semibold hover:from-green-600 hover:to-green-700 transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed">
+                        Verificar
+                    </button>
+                </div>
+
+                <!-- Feedback -->
+                <div id="feedback" class="hidden mt-6 p-4 rounded-lg">
+                    <div id="feedbackContent"></div>
+                    <button id="continueBtn" class="mt-4 px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
+                        Continuar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Game State
+        let gameState = {
+            currentLesson: 0,
+            currentQuestion: 0,
+            points: parseInt(localStorage.getItem('gdscript_points') || '0'),
+            streak: parseInt(localStorage.getItem('gdscript_streak') || '0'),
+            completedLessons: JSON.parse(localStorage.getItem('gdscript_completed') || '[]'),
+            lessonProgress: {}
+        };
+
+        // Lessons Data
+        const lessons = [
+            {
+                id: 1,
+                title: "Variables y Tipos",
+                description: "Aprende los fundamentos de las variables en GDScript",
+                icon: "📝",
+                questions: [
+                    {
+                        type: "multiple_choice",
+                        question: "¿Cómo declaras una variable entera en GDScript?",
+                        code: "# Declara una variable llamada 'vida' con valor 100",
+                        options: ["var vida = 100", "int vida = 100", "vida := 100", "variable vida = 100"],
+                        correct: 0,
+                        explanation: "En GDScript usamos 'var' para declarar variables. El tipo se infiere automáticamente."
+                    },
+                    {
+                        type: "code_completion",
+                        question: "Completa el código para declarar una variable de texto:",
+                        code: "var nombre = ____",
+                        placeholder: '"Mi Personaje"',
+                        correct: '"Mi Personaje"',
+                        explanation: "Las cadenas de texto van entre comillas dobles en GDScript."
+                    },
+                    {
+                        type: "multiple_choice",
+                        question: "¿Cuál es la forma correcta de declarar un booleano?",
+                        options: ["var activo = true", "bool activo = true", "var activo := boolean(true)", "activo = true"],
+                        correct: 0,
+                        explanation: "GDScript infiere automáticamente que es un booleano cuando asignas true o false."
+                    },
+                    {
+                        type: "drag_drop",
+                        question: "Ordena las líneas para declarar correctamente las variables:",
+                        items: ["var", "puntos", "=", "0"],
+                        correct: ["var", "puntos", "=", "0"],
+                        explanation: "La sintaxis correcta es: var nombre_variable = valor"
+                    },
+                    {
+                        type: "code_completion",
+                        question: "Declara una variable flotante con valor 3.14:",
+                        code: "var pi = ____",
+                        placeholder: "3.14",
+                        correct: "3.14",
+                        explanation: "Los números decimales se escriben con punto, no coma."
+                    }
+                ]
+            },
+            {
+                id: 2,
+                title: "Funciones Básicas",
+                description: "Crea y usa funciones en GDScript",
+                icon: "⚙️",
+                questions: [
+                    {
+                        type: "multiple_choice",
+                        question: "¿Cómo defines una función en GDScript?",
+                        options: ["func mi_funcion():", "function mi_funcion():", "def mi_funcion():", "void mi_funcion():"],
+                        correct: 0,
+                        explanation: "En GDScript usamos 'func' seguido del nombre y paréntesis."
+                    },
+                    {
+                        type: "code_completion",
+                        question: "Completa la función que suma dos números:",
+                        code: "func sumar(a, b):\n    return ____",
+                        placeholder: "a + b",
+                        correct: "a + b",
+                        explanation: "Simplemente sumamos los parámetros a y b."
+                    },
+                    {
+                        type: "multiple_choice",
+                        question: "¿Cómo llamas a una función llamada 'saltar'?",
+                        options: ["saltar()", "call saltar()", "execute saltar()", "run saltar()"],
+                        correct: 0,
+                        explanation: "Solo necesitas el nombre de la función seguido de paréntesis."
+                    },
+                    {
+                        type: "code_completion",
+                        question: "Crea una función que no retorna nada:",
+                        code: "func saludar():\n    print(\"¡Hola!\")\n    ____",
+                        placeholder: "# No necesita return",
+                        correct: "",
+                        explanation: "Las funciones que no retornan valor no necesitan 'return'."
+                    },
+                    {
+                        type: "multiple_choice",
+                        question: "¿Cómo defines una función con tipo de retorno específico?",
+                        options: ["func obtener_vida() -> int:", "func obtener_vida(): int", "func int obtener_vida():", "func obtener_vida() returns int:"],
+                        correct: 0,
+                        explanation: "Usamos -> seguido del tipo para especificar el tipo de retorno."
+                    }
+                ]
+            },
+            {
+                id: 3,
+                title: "Condicionales",
+                description: "Controla el flujo con if, elif y else",
+                icon: "🔀",
+                questions: [
+                    {
+                        type: "multiple_choice",
+                        question: "¿Cuál es la sintaxis correcta para un if?",
+                        options: ["if condicion:", "if (condicion):", "if condicion then:", "if condicion {}"],
+                        correct: 0,
+                        explanation: "En GDScript usamos 'if condicion:' sin paréntesis obligatorios."
+                    },
+                    {
+                        type: "code_completion",
+                        question: "Completa el condicional:",
+                        code: "if vida <= 0:\n    print(\"Game Over\")\n____:\n    print(\"Sigues vivo\")",
+                        placeholder: "else",
+                        correct: "else",
+                        explanation: "'else' maneja el caso cuando la condición es falsa."
+                    },
+                    {
+                        type: "multiple_choice",
+                        question: "¿Cómo agregas una condición adicional?",
+                        options: ["elif nueva_condicion:", "else if nueva_condicion:", "elseif nueva_condicion:", "if else nueva_condicion:"],
+                        correct: 0,
+                        explanation: "GDScript usa 'elif' para condiciones adicionales."
+                    },
+                    {
+                        type: "drag_drop",
+                        question: "Ordena el condicional correctamente:",
+                        items: ["if", "puntos", ">", "100", ":"],
+                        correct: ["if", "puntos", ">", "100", ":"],
+                        explanation: "La estructura es: if variable operador valor:"
+                    },
+                    {
+                        type: "code_completion",
+                        question: "Completa la comparación de igualdad:",
+                        code: "if nombre ____ \"Jugador\":\n    print(\"¡Hola Jugador!\")",
+                        placeholder: "==",
+                        correct: "==",
+                        explanation: "Usamos '==' para comparar igualdad, '=' es para asignación."
+                    }
+                ]
+            },
+            {
+                id: 4,
+                title: "Bucles For",
+                description: "Repite código con bucles for",
+                icon: "🔄",
+                questions: [
+                    {
+                        type: "multiple_choice",
+                        question: "¿Cómo creas un bucle for que cuenta del 1 al 5?",
+                        options: ["for i in range(1, 6):", "for i in 1..5:", "for (i = 1; i <= 5; i++):", "for i from 1 to 5:"],
+                        correct: 0,
+                        explanation: "range(1, 6) genera números del 1 al 5 (el 6 no se incluye)."
+                    },
+                    {
+                        type: "code_completion",
+                        question: "Completa el bucle para iterar una lista:",
+                        code: "var frutas = [\"manzana\", \"banana\"]\nfor fruta ____ frutas:\n    print(fruta)",
+                        placeholder: "in",
+                        correct: "in",
+                        explanation: "Usamos 'in' para iterar sobre los elementos de una lista."
+                    },
+                    {
+                        type: "multiple_choice",
+                        question: "¿Cómo creas un bucle que cuenta hacia atrás?",
+                        options: ["for i in range(5, 0, -1):", "for i in reverse(1, 5):", "for i in 5..1:", "for i in countdown(5, 1):"],
+                        correct: 0,
+                        explanation: "El tercer parámetro -1 en range() hace que cuente hacia atrás."
+                    },
+                    {
+                        type: "code_completion",
+                        question: "Completa el bucle para 10 iteraciones:",
+                        code: "for i in range(____):\n    print(\"Iteración: \", i)",
+                        placeholder: "10",
+                        correct: "10",
+                        explanation: "range(10) genera números del 0 al 9 (10 números en total)."
+                    },
+                    {
+                        type: "multiple_choice",
+                        question: "¿Cómo sales de un bucle prematuramente?",
+                        options: ["break", "exit", "stop", "return"],
+                        correct: 0,
+                        explanation: "'break' termina inmediatamente el bucle actual."
+                    }
+                ]
+            },
+            {
+                id: 5,
+                title: "Bucles While",
+                description: "Bucles condicionales con while",
+                icon: "⏳",
+                questions: [
+                    {
+                        type: "multiple_choice",
+                        question: "¿Cuál es la sintaxis correcta para un while?",
+                        options: ["while condicion:", "while (condicion):", "while condicion do:", "while condicion {}"],
+                        correct: 0,
+                        explanation: "Similar al if, while usa 'while condicion:' sin paréntesis obligatorios."
+                    },
+                    {
+                        type: "code_completion",
+                        question: "Completa el bucle while:",
+                        code: "var contador = 0\n____ contador < 5:\n    print(contador)\n    contador += 1",
+                        placeholder: "while",
+                        correct: "while",
+                        explanation: "'while' ejecuta el código mientras la condición sea verdadera."
+                    },
+                    {
+                        type: "multiple_choice",
+                        question: "¿Qué hace 'continue' en un bucle?",
+                        options: ["Salta a la siguiente iteración", "Termina el bucle", "Pausa el bucle", "Reinicia el bucle"],
+                        correct: 0,
+                        explanation: "'continue' salta el resto del código y va a la siguiente iteración."
+                    },
+                    {
+                        type: "code_completion",
+                        question: "Evita un bucle infinito incrementando la variable:",
+                        code: "var x = 0\nwhile x < 3:\n    print(x)\n    x ____",
+                        placeholder: "+= 1",
+                        correct: "+= 1",
+                        explanation: "Siempre incrementa la variable de control para evitar bucles infinitos."
+                    },
+                    {
+                        type: "multiple_choice",
+                        question: "¿Cuándo se evalúa la condición del while?",
+                        options: ["Antes de cada iteración", "Después de cada iteración", "Solo al inicio", "Solo al final"],
+                        correct: 0,
+                        explanation: "La condición se evalúa antes de cada iteración del bucle."
+                    }
+                ]
+            },
+            {
+                id: 6,
+                title: "Arrays y Listas",
+                description: "Maneja colecciones de datos",
+                icon: "📋",
+                questions: [
+                    {
+                        type: "multiple_choice",
+                        question: "¿Cómo declaras un array vacío?",
+                        options: ["var lista = []", "var lista = Array()", "var lista = new Array()", "var lista = array()"],
+                        correct: 0,
+                        explanation: "Los corchetes vacíos [] crean un array vacío en GDScript."
+                    },
+                    {
+                        type: "code_completion",
+                        question: "Agrega un elemento al final del array:",
+                        code: "var numeros = [1, 2, 3]\nnumeros.______(4)",
+                        placeholder: "append",
+                        correct: "append",
+                        explanation: "append() agrega un elemento al final del array."
+                    },
+                    {
+                        type: "multiple_choice",
+                        question: "¿Cómo accedes al primer elemento de un array?",
+                        options: ["array[0]", "array[1]", "array.first()", "array.get(0)"],
+                        correct: 0,
+                        explanation: "Los arrays empiezan en índice 0, así que el primer elemento es [0]."
+                    },
+                    {
+                        type: "code_completion",
+                        question: "Obtén el tamaño del array:",
+                        code: "var colores = [\"rojo\", \"verde\", \"azul\"]\nvar tamaño = colores.____",
+                        placeholder: "size()",
+                        correct: "size()",
+                        explanation: "size() retorna el número de elementos en el array."
+                    },
+                    {
+                        type: "multiple_choice",
+                        question: "¿Cómo eliminas un elemento por índice?",
+                        options: ["array.remove(indice)", "array.delete(indice)", "array.erase(indice)", "array.pop(indice)"],
+                        correct: 0,
+                        explanation: "remove(indice) elimina el elemento en la posición especificada."
+                    }
+                ]
+            },
+            {
+                id: 7,
+                title: "Diccionarios",
+                description: "Almacena datos con clave-valor",
+                icon: "🗂️",
+                questions: [
+                    {
+                        type: "multiple_choice",
+                        question: "¿Cómo declaras un diccionario vacío?",
+                        options: ["var dict = {}", "var dict = Dictionary()", "var dict = []", "var dict = new Dict()"],
+                        correct: 0,
+                        explanation: "Las llaves vacías {} crean un diccionario vacío."
+                    },
+                    {
+                        type: "code_completion",
+                        question: "Agrega un valor al diccionario:",
+                        code: "var jugador = {}\njugador[____] = \"Juan\"",
+                        placeholder: '"nombre"',
+                        correct: '"nombre"',
+                        explanation: "Usamos corchetes con la clave entre comillas para asignar valores."
+                    },
+                    {
+                        type: "multiple_choice",
+                        question: "¿Cómo accedes a un valor del diccionario?",
+                        options: ["dict[\"clave\"]", "dict.clave", "dict->clave", "dict.get_value(\"clave\")"],
+                        correct: 0,
+                        explanation: "Usamos corchetes con la clave para acceder a los valores."
+                    },
+                    {
+                        type: "code_completion",
+                        question: "Verifica si existe una clave:",
+                        code: "var config = {\"volumen\": 0.8}\nif config.______(\"volumen\"):\n    print(\"Volumen configurado\")",
+                        placeholder: "has",
+                        correct: "has",
+                        explanation: "has() verifica si una clave existe en el diccionario."
+                    },
+                    {
+                        type: "multiple_choice",
+                        question: "¿Cómo obtienes todas las claves?",
+                        options: ["dict.keys()", "dict.get_keys()", "dict.all_keys()", "dict.key_list()"],
+                        correct: 0,
+                        explanation: "keys() retorna un array con todas las claves del diccionario."
+                    }
+                ]
+            },
+            {
+                id: 8,
+                title: "Clases y Objetos",
+                description: "Programa orientado a objetos",
+                icon: "🏗️",
+                questions: [
+                    {
+                        type: "multiple_choice",
+                        question: "¿Cómo defines una clase en GDScript?",
+                        options: ["class_name MiClase", "class MiClase:", "define class MiClase:", "object MiClase:"],
+                        correct: 0,
+                        explanation: "class_name define una clase que puede ser referenciada desde otros scripts."
+                    },
+                    {
+                        type: "code_completion",
+                        question: "Declara una variable de clase:",
+                        code: "class_name Jugador\n\n____ vida = 100",
+                        placeholder: "var",
+                        correct: "var",
+                        explanation: "Las variables de clase se declaran con 'var' como las variables normales."
+                    },
+                    {
+                        type: "multiple_choice",
+                        question: "¿Cómo defines el constructor de una clase?",
+                        options: ["func _init():", "func constructor():", "func new():", "func create():"],
+                        correct: 0,
+                        explanation: "_init() es el constructor que se ejecuta al crear una instancia."
+                    },
+                    {
+                        type: "code_completion",
+                        question: "Crea una instancia de la clase:",
+                        code: "var mi_jugador = ______.new()",
+                        placeholder: "Jugador",
+                        correct: "Jugador",
+                        explanation: "Usamos NombreClase.new() para crear una nueva instancia."
+                    },
+                    {
+                        type: "multiple_choice",
+                        question: "¿Cómo haces que una clase herede de otra?",
+                        options: ["extends ClasePadre", "inherits ClasePadre", "class_extends ClasePadre", "derives ClasePadre"],
+                        correct: 0,
+                        explanation: "'extends' hace que la clase herede de otra clase."
+                    }
+                ]
+            },
+            {
+                id: 9,
+                title: "Señales (Signals)",
+                description: "Comunicación entre objetos",
+                icon: "📡",
+                questions: [
+                    {
+                        type: "multiple_choice",
+                        question: "¿Cómo declaras una señal?",
+                        options: ["signal mi_señal", "var signal mi_señal", "func signal mi_señal", "event mi_señal"],
+                        correct: 0,
+                        explanation: "Usamos 'signal' seguido del nombre para declarar una señal."
+                    },
+                    {
+                        type: "code_completion",
+                        question: "Emite una señal:",
+                        code: "signal vida_cambio\n\nfunc recibir_daño():\n    vida -= 10\n    ______.emit()",
+                        placeholder: "vida_cambio",
+                        correct: "vida_cambio",
+                        explanation: "Usamos nombre_señal.emit() para emitir la señal."
+                    },
+                    {
+                        type: "multiple_choice",
+                        question: "¿Cómo conectas una señal a una función?",
+                        options: ["objeto.señal.connect(funcion)", "connect(objeto.señal, funcion)", "objeto.connect_signal(señal, funcion)", "bind(objeto.señal, funcion)"],
+                        correct: 0,
+                        explanation: "Usamos señal.connect() para conectar una señal a una función."
+                    },
+                    {
+                        type: "code_completion",
+                        question: "Declara una señal con parámetros:",
+                        code: "signal jugador_murio(____)",
+                        placeholder: "nombre",
+                        correct: "nombre",
+                        explanation: "Puedes pasar parámetros en las señales como en las funciones."
+                    },
+                    {
+                        type: "multiple_choice",
+                        question: "¿Cuándo se ejecuta la función conectada?",
+                        options: ["Cuando se emite la señal", "Cuando se declara la señal", "Cuando se conecta la señal", "Automáticamente cada frame"],
+                        correct: 0,
+                        explanation: "La función conectada se ejecuta cada vez que se emite la señal."
+                    }
+                ]
+            },
+            {
+                id: 10,
+                title: "Nodos y Escenas",
+                description: "Trabaja con el sistema de nodos de Godot",
+                icon: "🌳",
+                questions: [
+                    {
+                        type: "multiple_choice",
+                        question: "¿Cómo obtienes un nodo hijo por nombre?",
+                        options: ["get_node(\"NombreNodo\")", "find_node(\"NombreNodo\")", "child_node(\"NombreNodo\")", "node(\"NombreNodo\")"],
+                        correct: 0,
+                        explanation: "get_node() busca un nodo por su ruta en el árbol de escena."
+                    },
+                    {
+                        type: "code_completion",
+                        question: "Usa la sintaxis corta para obtener un nodo:",
+                        code: "var boton = ____\"MiBoton\"",
+                        placeholder: "$",
+                        correct: "$",
+                        explanation: "$ es la sintaxis corta para get_node()."
+                    },
+                    {
+                        type: "multiple_choice",
+                        question: "¿Cómo agregas un nodo como hijo?",
+                        options: ["add_child(nodo)", "append_child(nodo)", "insert_child(nodo)", "attach_child(nodo)"],
+                        correct: 0,
+                        explanation: "add_child() agrega un nodo como hijo del nodo actual."
+                    },
+                    {
+                        type: "code_completion",
+                        question: "Elimina un nodo del árbol:",
+                        code: "var enemigo = $Enemigo\nenemigo.______()",
+                        placeholder: "queue_free",
+                        correct: "queue_free",
+                        explanation: "queue_free() marca el nodo para eliminación al final del frame."
+                    },
+                    {
+                        type: "multiple_choice",
+                        question: "¿Qué función se llama cuando el nodo entra al árbol?",
+                        options: ["_ready()", "_start()", "_init()", "_enter()"],
+                        correct: 0,
+                        explanation: "_ready() se ejecuta cuando el nodo y sus hijos están listos."
+                    }
+                ]
+            },
+            {
+                id: 11,
+                title: "Input y Eventos",
+                description: "Maneja la entrada del usuario",
+                icon: "🎮",
+                questions: [
+                    {
+                        type: "multiple_choice",
+                        question: "¿Qué función maneja los eventos de entrada?",
+                        options: ["_input(event)", "_handle_input(event)", "_on_input(event)", "_process_input(event)"],
+                        correct: 0,
+                        explanation: "_input() recibe todos los eventos de entrada del usuario."
+                    },
+                    {
+                        type: "code_completion",
+                        question: "Verifica si se presionó una tecla:",
+                        code: "func _input(event):\n    if event is InputEventKey and event.______:\n        print(\"Tecla presionada\")",
+                        placeholder: "pressed",
+                        correct: "pressed",
+                        explanation: "event.pressed indica si la tecla fue presionada (true) o soltada (false)."
+                    },
+                    {
+                        type: "multiple_choice",
+                        question: "¿Cómo verificas si se presionó una acción específica?",
+                        options: ["Input.is_action_pressed(\"accion\")", "event.is_action(\"accion\")", "check_action(\"accion\")", "get_action(\"accion\")"],
+                        correct: 0,
+                        explanation: "Input.is_action_pressed() verifica si una acción está siendo presionada."
+                    },
+                    {
+                        type: "code_completion",
+                        question: "Detecta cuando se suelta una acción:",
+                        code: "if Input.is_action_just________(\"saltar\"):\n    print(\"Dejó de saltar\")",
+                        placeholder: "released",
+                        correct: "released",
+                        explanation: "is_action_just_released() detecta el momento exacto cuando se suelta la acción."
+                    },
+                    {
+                        type: "multiple_choice",
+                        question: "¿Cómo obtienes la posición del mouse?",
+                        options: ["get_global_mouse_position()", "Input.mouse_position()", "mouse.get_position()", "get_mouse_pos()"],
+                        correct: 0,
+                        explanation: "get_global_mouse_position() retorna la posición global del mouse."
+                    }
+                ]
+            },
+            {
+                id: 12,
+                title: "Física y Colisiones",
+                description: "Implementa física básica en tus juegos",
+                icon: "⚽",
+                questions: [
+                    {
+                        type: "multiple_choice",
+                        question: "¿Qué tipo de nodo usas para física 2D?",
+                        options: ["RigidBody2D", "PhysicsBody2D", "CollisionBody2D", "DynamicBody2D"],
+                        correct: 0,
+                        explanation: "RigidBody2D maneja automáticamente la física y colisiones."
+                    },
+                    {
+                        type: "code_completion",
+                        question: "Aplica una fuerza a un RigidBody2D:",
+                        code: "var cuerpo = $RigidBody2D\ncuerpo.______(Vector2(100, 0))",
+                        placeholder: "apply_impulse",
+                        correct: "apply_impulse",
+                        explanation: "apply_impulse() aplica una fuerza instantánea al cuerpo rígido."
+                    },
+                    {
+                        type: "multiple_choice",
+                        question: "¿Qué función detecta colisiones en un KinematicBody2D?",
+                        options: ["move_and_collide()", "check_collision()", "detect_collision()", "test_move()"],
+                        correct: 0,
+                        explanation: "move_and_collide() mueve el cuerpo y retorna información de colisión."
+                    },
+                    {
+                        type: "code_completion",
+                        question: "Verifica si un Area2D está siendo tocada:",
+                        code: "func _on_Area2D_body_entered(body):\n    if body.is_in_group(\"____\"):\n        print(\"Jugador entró\")",
+                        placeholder: "jugador",
+                        correct: "jugador",
+                        explanation: "is_in_group() verifica si el cuerpo pertenece a un grupo específico."
+                    },
+                    {
+                        type: "multiple_choice",
+                        question: "¿Cómo defines la gravedad personalizada?",
+                        options: ["gravity_scale", "custom_gravity", "gravity_force", "weight"],
+                        correct: 0,
+                        explanation: "gravity_scale multiplica la gravedad global del proyecto."
+                    }
+                ]
+            }
+        ];
+
+        // Initialize game
+        function initGame() {
+            updateUI();
+            renderLessonMap();
+        }
+
+        // Update UI elements
+        function updateUI() {
+            document.getElementById('points').textContent = gameState.points;
+            document.getElementById('streak').textContent = gameState.streak;
+            
+            const overallProgress = (gameState.completedLessons.length / lessons.length) * 100;
+            document.getElementById('overallProgress').style.width = overallProgress + '%';
+        }
+
+        // Render lesson map
+        function renderLessonMap() {
+            const grid = document.getElementById('lessonsGrid');
+            grid.innerHTML = '';
+
+            lessons.forEach((lesson, index) => {
+                const isCompleted = gameState.completedLessons.includes(lesson.id);
+                const isAvailable = index === 0 || gameState.completedLessons.includes(lessons[index - 1].id);
+                const isCurrent = !isCompleted && isAvailable;
+
+                let statusClass = 'lesson-locked';
+                if (isCompleted) statusClass = 'lesson-complete';
+                else if (isCurrent) statusClass = 'lesson-current';
+
+                const lessonCard = document.createElement('div');
+                lessonCard.className = `${statusClass} rounded-xl p-6 text-white cursor-pointer transform transition-all hover:scale-105 ${isAvailable ? '' : 'cursor-not-allowed'}`;
+                
+                lessonCard.innerHTML = `
+                    <div class="text-4xl mb-3">${lesson.icon}</div>
+                    <h3 class="text-xl font-bold mb-2">${lesson.title}</h3>
+                    <p class="text-sm opacity-90 mb-4">${lesson.description}</p>
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs">${lesson.questions.length} preguntas</span>
+                        ${isCompleted ? '<span class="text-xs">✓ Completado</span>' : ''}
+                        ${!isAvailable ? '<span class="text-xs">🔒 Bloqueado</span>' : ''}
+                    </div>
+                `;
+
+                if (isAvailable) {
+                    lessonCard.addEventListener('click', () => startLesson(index));
+                }
+
+                grid.appendChild(lessonCard);
+            });
+        }
+
+        // Start a lesson
+        function startLesson(lessonIndex) {
+            gameState.currentLesson = lessonIndex;
+            gameState.currentQuestion = 0;
+            
+            document.getElementById('lessonMap').classList.add('hidden');
+            document.getElementById('lessonContent').classList.remove('hidden');
+            
+            showQuestion();
+        }
+
+        // Show current question
+        function showQuestion() {
+            const lesson = lessons[gameState.currentLesson];
+            const question = lesson.questions[gameState.currentQuestion];
+            const questionContent = document.getElementById('questionContent');
+            
+            // Update progress
+            const progress = ((gameState.currentQuestion + 1) / lesson.questions.length) * 100;
+            document.getElementById('lessonProgress').style.width = progress + '%';
+            document.getElementById('questionCounter').textContent = `${gameState.currentQuestion + 1}/${lesson.questions.length}`;
+            
+            // Hide feedback
+            document.getElementById('feedback').classList.add('hidden');
+            document.getElementById('checkBtn').disabled = false;
+            document.getElementById('checkBtn').textContent = 'Verificar';
+            
+            // Render question based on type
+            switch (question.type) {
+                case 'multiple_choice':
+                    renderMultipleChoice(question);
+                    break;
+                case 'code_completion':
+                    renderCodeCompletion(question);
+                    break;
+                case 'drag_drop':
+                    renderDragDrop(question);
+                    break;
+            }
+        }
+
+        // Render multiple choice question
+        function renderMultipleChoice(question) {
+            const content = document.getElementById('questionContent');
+            content.innerHTML = `
+                <div class="mb-6">
+                    <h3 class="text-2xl font-bold text-gray-800 mb-4">${question.question}</h3>
+                    ${question.code ? `<div class="code-editor p-4 text-green-400 mb-4"><pre><code>${question.code}</code></pre></div>` : ''}
+                </div>
+                <div class="space-y-3" id="options">
+                    ${question.options.map((option, index) => `
+                        <button class="option-btn w-full p-4 text-left border-2 border-gray-200 rounded-lg hover:border-blue-300 transition-colors" data-index="${index}">
+                            ${option}
+                        </button>
+                    `).join('')}
+                </div>
+            `;
+
+            // Add click handlers
+            document.querySelectorAll('.option-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.option-btn').forEach(b => b.classList.remove('border-blue-500', 'bg-blue-50'));
+                    btn.classList.add('border-blue-500', 'bg-blue-50');
+                    btn.dataset.selected = 'true';
+                });
+            });
+        }
+
+        // Render code completion question
+        function renderCodeCompletion(question) {
+            const content = document.getElementById('questionContent');
+            content.innerHTML = `
+                <div class="mb-6">
+                    <h3 class="text-2xl font-bold text-gray-800 mb-4">${question.question}</h3>
+                    <div class="code-editor p-4 text-green-400 mb-4">
+                        <pre><code>${question.code}</code></pre>
+                    </div>
+                    <input type="text" id="codeInput" class="w-full p-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:outline-none" placeholder="${question.placeholder}">
+                </div>
+            `;
+        }
+
+        // Render drag and drop question
+        function renderDragDrop(question) {
+            const content = document.getElementById('questionContent');
+            const shuffled = [...question.items].sort(() => Math.random() - 0.5);
+            
+            content.innerHTML = `
+                <div class="mb-6">
+                    <h3 class="text-2xl font-bold text-gray-800 mb-4">${question.question}</h3>
+                    <div class="mb-6">
+                        <h4 class="text-lg font-semibold mb-3">Arrastra los elementos en orden:</h4>
+                        <div id="dragItems" class="flex flex-wrap gap-2 mb-4 p-4 bg-gray-50 rounded-lg min-h-16">
+                            ${shuffled.map((item, index) => `
+                                <div class="drag-item bg-blue-500 text-white px-3 py-2 rounded cursor-move" draggable="true" data-item="${item}">
+                                    ${item}
+                                </div>
+                            `).join('')}
+                        </div>
+                        <div id="dropZone" class="border-2 border-dashed border-gray-300 rounded-lg p-4 min-h-16 bg-gray-50">
+                            <p class="text-gray-500 text-center">Suelta los elementos aquí en el orden correcto</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            setupDragAndDrop();
+        }
+
+        // Setup drag and drop functionality
+        function setupDragAndDrop() {
+            const dragItems = document.querySelectorAll('.drag-item');
+            const dropZone = document.getElementById('dropZone');
+            let draggedElement = null;
+
+            dragItems.forEach(item => {
+                item.addEventListener('dragstart', (e) => {
+                    draggedElement = e.target;
+                    e.target.style.opacity = '0.5';
+                });
+
+                item.addEventListener('dragend', (e) => {
+                    e.target.style.opacity = '1';
+                });
+            });
+
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.classList.add('border-blue-500', 'bg-blue-50');
+            });
+
+            dropZone.addEventListener('dragleave', () => {
+                dropZone.classList.remove('border-blue-500', 'bg-blue-50');
+            });
+
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('border-blue-500', 'bg-blue-50');
+                
+                if (draggedElement) {
+                    const clone = draggedElement.cloneNode(true);
+                    clone.classList.remove('cursor-move');
+                    clone.classList.add('cursor-pointer');
+                    clone.draggable = false;
+                    
+                    // Add click to remove
+                    clone.addEventListener('click', () => {
+                        clone.remove();
+                        if (dropZone.children.length === 1) {
+                            dropZone.innerHTML = '<p class="text-gray-500 text-center">Suelta los elementos aquí en el orden correcto</p>';
+                        }
+                    });
+
+                    if (dropZone.children.length === 1 && dropZone.children[0].tagName === 'P') {
+                        dropZone.innerHTML = '';
+                    }
+                    
+                    dropZone.appendChild(clone);
+                    draggedElement.remove();
+                }
+            });
+        }
+
+        // Check answer
+        function checkAnswer() {
+            const lesson = lessons[gameState.currentLesson];
+            const question = lesson.questions[gameState.currentQuestion];
+            let isCorrect = false;
+            let userAnswer = '';
+
+            switch (question.type) {
+                case 'multiple_choice':
+                    const selectedBtn = document.querySelector('.option-btn[data-selected="true"]');
+                    if (selectedBtn) {
+                        const selectedIndex = parseInt(selectedBtn.dataset.index);
+                        isCorrect = selectedIndex === question.correct;
+                        userAnswer = question.options[selectedIndex];
+                        
+                        // Visual feedback
+                        document.querySelectorAll('.option-btn').forEach((btn, index) => {
+                            if (index === question.correct) {
+                                btn.classList.add('correct-answer');
+                            } else if (btn === selectedBtn && !isCorrect) {
+                                btn.classList.add('wrong-answer');
+                            }
+                        });
+                    }
+                    break;
+                    
+                case 'code_completion':
+                    userAnswer = document.getElementById('codeInput').value.trim();
+                    isCorrect = userAnswer.toLowerCase() === question.correct.toLowerCase();
+                    
+                    const input = document.getElementById('codeInput');
+                    if (isCorrect) {
+                        input.classList.add('border-green-500', 'bg-green-50');
+                    } else {
+                        input.classList.add('border-red-500', 'bg-red-50');
+                    }
+                    break;
+                    
+                case 'drag_drop':
+                    const dropZone = document.getElementById('dropZone');
+                    const droppedItems = Array.from(dropZone.children)
+                        .filter(child => child.dataset.item)
+                        .map(child => child.dataset.item);
+                    
+                    isCorrect = JSON.stringify(droppedItems) === JSON.stringify(question.correct);
+                    userAnswer = droppedItems.join(' ');
+                    break;
+            }
+
+            showFeedback(isCorrect, question.explanation);
+            
+            if (isCorrect) {
+                gameState.points += 10;
+                updateUI();
+            }
+        }
+
+        // Show feedback
+        function showFeedback(isCorrect, explanation) {
+            const feedback = document.getElementById('feedback');
+            const feedbackContent = document.getElementById('feedbackContent');
+            
+            feedback.classList.remove('hidden');
+            
+            if (isCorrect) {
+                feedback.className = 'mt-6 p-4 rounded-lg bg-green-100 border border-green-300';
+                feedbackContent.innerHTML = `
+                    <div class="flex items-center space-x-2 mb-2">
+                        <span class="text-green-600 text-xl">✅</span>
+                        <span class="font-semibold text-green-800">¡Correcto!</span>
+                    </div>
+                    <p class="text-green-700">${explanation}</p>
+                `;
+            } else {
+                feedback.className = 'mt-6 p-4 rounded-lg bg-red-100 border border-red-300';
+                feedbackContent.innerHTML = `
+                    <div class="flex items-center space-x-2 mb-2">
+                        <span class="text-red-600 text-xl">❌</span>
+                        <span class="font-semibold text-red-800">Incorrecto</span>
+                    </div>
+                    <p class="text-red-700">${explanation}</p>
+                `;
+            }
+            
+            document.getElementById('checkBtn').disabled = true;
+        }
+
+        // Continue to next question
+        function continueLesson() {
+            const lesson = lessons[gameState.currentLesson];
+            
+            if (gameState.currentQuestion < lesson.questions.length - 1) {
+                gameState.currentQuestion++;
+                showQuestion();
+            } else {
+                completeLesson();
+            }
+        }
+
+        // Complete lesson
+        function completeLesson() {
+            const lessonId = lessons[gameState.currentLesson].id;
+            
+            if (!gameState.completedLessons.includes(lessonId)) {
+                gameState.completedLessons.push(lessonId);
+                gameState.points += 50; // Bonus for completing lesson
+                gameState.streak++;
+                
+                // Save progress
+                localStorage.setItem('gdscript_points', gameState.points.toString());
+                localStorage.setItem('gdscript_streak', gameState.streak.toString());
+                localStorage.setItem('gdscript_completed', JSON.stringify(gameState.completedLessons));
+            }
+            
+            // Show completion message
+            const content = document.getElementById('questionContent');
+            content.innerHTML = `
+                <div class="text-center py-12">
+                    <div class="text-6xl mb-4">🎉</div>
+                    <h2 class="text-3xl font-bold text-gray-800 mb-4">¡Lección Completada!</h2>
+                    <p class="text-gray-600 mb-6">Has dominado: ${lessons[gameState.currentLesson].title}</p>
+                    <div class="flex justify-center space-x-8 mb-8">
+                        <div class="text-center">
+                            <div class="text-2xl font-bold text-blue-600">+50</div>
+                            <div class="text-sm text-gray-600">Puntos</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-2xl font-bold text-orange-600">+1</div>
+                            <div class="text-sm text-gray-600">Racha</div>
+                        </div>
+                    </div>
+                    <button id="backToMapFromComplete" class="px-8 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg font-semibold hover:from-blue-600 hover:to-purple-700 transition-all transform hover:scale-105">
+                        Continuar Aprendiendo
+                    </button>
+                </div>
+            `;
+            
+            document.getElementById('feedback').classList.add('hidden');
+            document.getElementById('backToMapFromComplete').addEventListener('click', backToMap);
+            
+            updateUI();
+        }
+
+        // Back to lesson map
+        function backToMap() {
+            document.getElementById('lessonContent').classList.add('hidden');
+            document.getElementById('lessonMap').classList.remove('hidden');
+            renderLessonMap();
+        }
+
+        // Event listeners
+        document.getElementById('backToMap').addEventListener('click', backToMap);
+        document.getElementById('checkBtn').addEventListener('click', checkAnswer);
+        document.getElementById('continueBtn').addEventListener('click', continueLesson);
+        document.getElementById('skipBtn').addEventListener('click', continueLesson);
+
+        // Initialize the game
+        initGame();
+    </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9844a0def36529fe',t:'MTc1ODc0MTUxNC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
